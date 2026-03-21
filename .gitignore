@@ -1,0 +1,6 @@
+.env
+__pycache__
+user.db
+tempCodeRunnerFile.py
+test_groq.py
+.venv
