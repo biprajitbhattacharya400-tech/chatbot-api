@@ -1,7 +1,8 @@
-# 🚀 FastAPI + Groq LLM API Project
+# 🚀 FastAPI + Groq LLM + RAG API Project
 
 A clean and simple backend project built with **FastAPI**, **SQLAlchemy**, and **Groq LLM integration**.
-This API allows you to manage users and interact with an AI model through a dedicated endpoint.
+
+This API allows you to manage users, interact with an AI model, and now includes a **Retrieval-Augmented Generation (RAG)** system for more accurate, context-aware responses.
 
 ---
 
@@ -12,6 +13,8 @@ This API allows you to manage users and interact with an AI model through a dedi
 * 👤 User management (CRUD basics)
 * 🤖 AI-powered endpoint using Groq (LLaMA 3.3 model)
 * 🔐 Environment variable support for API keys
+* 🔥 Retrieval-Augmented Generation (RAG) system (`/ask-doc`)
+* 📄 Context-based AI responses using custom documents
 
 ---
 
@@ -21,7 +24,7 @@ This API allows you to manage users and interact with an AI model through a dedi
 * SQLAlchemy
 * SQLite
 * Pydantic
-* Groq API (LLM)
+* Groq API (LLM - LLaMA 3.3 70B)
 * Python-dotenv
 
 ---
@@ -42,13 +45,10 @@ This API allows you to manage users and interact with an AI model through a dedi
 
 ### 1️⃣ Clone the repository
 
+```bash
 git clone https://github.com/biprajitbhattacharya400-tech/chatbot-api.git
-
 cd chatbot-api
-
-pip install -r requirements.txt
-
-uvicorn main:app --reload
+```
 
 ---
 
@@ -65,7 +65,7 @@ venv\Scripts\activate      # Windows
 ### 3️⃣ Install dependencies
 
 ```bash
-pip install fastapi uvicorn sqlalchemy pydantic python-dotenv groq
+pip install -r requirements.txt
 ```
 
 ---
@@ -143,7 +143,7 @@ POST /users/
 
 ---
 
-### 🤖 Ask AI
+### 🤖 Ask AI (General LLM)
 
 ```
 POST /ask-ai
@@ -167,21 +167,73 @@ POST /ask-ai
 
 ---
 
+### 🔥 Ask AI with Documents (RAG)
+
+```
+POST /ask-doc
+```
+
+**Request Body:**
+
+```json
+{
+  "prompt": "What is RAG?"
+}
+```
+
+**Response:**
+
+```json
+{
+  "answer": "RAG stands for Retrieval Augmented Generation...",
+  "context_used": [
+    "RAG stands for Retrieval Augmented Generation..."
+  ]
+}
+```
+
+---
+
 ## 🧠 How AI Integration Works
 
-1. User sends a prompt
-2. FastAPI receives it via Pydantic model
-3. Prompt is sent to Groq LLM
-4. Model generates response
-5. API returns the answer
+### 🤖 Basic LLM (`/ask-ai`)
+
+1. User sends a prompt  
+2. FastAPI receives it via Pydantic model  
+3. Prompt is sent to Groq LLM  
+4. Model generates response  
+5. API returns the answer  
+
+---
+
+### 🔥 RAG System (`/ask-doc`)
+
+1. User sends a question  
+2. System searches relevant documents using keyword matching (`search_docs`)  
+3. Top matching documents are selected  
+4. Documents are passed as **context** to the LLM  
+5. LLM generates answer based only on that context  
+
+👉 This improves:
+- Accuracy  
+- Reliability  
+- Reduces hallucination  
+
+---
+
+## 🧠 Example RAG Flow
+
+```
+User Question → Search Docs → Add Context → LLM → Answer
+```
 
 ---
 
 ## ⚠️ Common Issues
 
-* ❌ API key not set → ensure `.env` is loaded
-* ❌ Wrong method name → use `completions.create()`
-* ❌ Typo in response → use `message.content`
+* ❌ API key not set → ensure `.env` is loaded  
+* ❌ Wrong method name → use `completions.create()`  
+* ❌ Typo in response → use `message.content`  
 
 ---
 
@@ -191,6 +243,8 @@ POST /ask-ai
 * Streaming responses
 * Authentication system
 * Frontend integration (React / Next.js)
+* 📂 Upload custom documents (PDF, TXT)
+* 🧠 Vector database (FAISS / Pinecone for advanced RAG)
 
 ---
 
@@ -198,9 +252,10 @@ POST /ask-ai
 
 Built as a learning + practical project to understand:
 
-* Backend APIs
-* Database integration
-* LLM integration in real-world apps
+* Backend APIs  
+* Database integration  
+* LLM integration in real-world apps  
+* Retrieval-Augmented Generation (RAG)  
 
 ---
 
