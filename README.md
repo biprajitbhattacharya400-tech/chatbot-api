@@ -43,8 +43,11 @@ This API allows you to manage users and interact with an AI model through a dedi
 ### 1️⃣ Clone the repository
 
 git clone https://github.com/biprajitbhattacharya400-tech/chatbot-api.git
+
 cd chatbot-api
+
 pip install -r requirements.txt
+
 uvicorn main:app --reload
 
 ---
