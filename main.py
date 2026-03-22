@@ -7,6 +7,9 @@ from sqlalchemy import create_engine, Column , Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
+from sentence_transformers import SentenceTransformer
+import numpy as np
+
 
 from dotenv import load_dotenv    
 load_dotenv()
@@ -18,7 +21,7 @@ client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
 )
 
-
+embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
 
 documents = [
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
@@ -34,25 +37,30 @@ documents = [
     "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
+doc_embeddings = embedding_model.encode(documents)
+
+
+
+
+
 def search_docs(query):
-    results = []
-    query_words = query.lower().split()
+    query_embedding = embedding_model.encode(query)
 
-    for doc in documents:
-        score = 0
+    similarities = []
 
-        for word in query_words:
-            if word in doc.lower():
-                score += 1
+    for i, doc_embedding in enumerate(doc_embeddings):
+        similarity = np.dot(query_embedding, doc_embedding) / (
+            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
+        )
+        similarities.append((similarity, documents[i]))
 
-        if score > 0:
-            results.append((score, doc))
+    similarities.sort(reverse=True)
 
-    
-    results.sort(reverse=True)#--------------------------> sort korbo (highest score first)
+    return [doc for score, doc in similarities[:3]]
 
 
-    return [doc for score, doc in results[:3]]  #--------> Return top 3 docs
+
+
 
 engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False}) 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -142,6 +150,7 @@ def ask_doc(request: PromptRequest):
 
     # 3. Create prompt
     final_prompt = f"""
+
 You are a helpful assistant.
 
 Answer ONLY using the context below.
