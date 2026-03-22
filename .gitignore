@@ -1,6 +1,7 @@
 .env
-__pycache__
-user.db
+__pycache__/
+*.db
 tempCodeRunnerFile.py
 test_groq.py
-.venv
+.venv/
+user.db
