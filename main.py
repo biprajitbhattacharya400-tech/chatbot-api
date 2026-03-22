@@ -8,7 +8,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
 
-from dotenv import load_dotenv    #---------------------------------------->
+from dotenv import load_dotenv    
 load_dotenv()
 
 
@@ -21,27 +21,27 @@ client = Groq(
 
 
 
-engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False}) #--------------------> Database setup Korlam
+engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False}) 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 
-class UserDB(Base):  # ----------------------> DATABASE MODEL 
+class UserDB(Base): 
     __tablename__ = "users"
     id=Column(Integer,primary_key=True,index=True)
     name = Column(String(100), nullable=False)
     score = Column(Integer)
 
-class UserCreate(BaseModel): #----------------------> Pydantic model 
+class UserCreate(BaseModel): 
     name: str
     score: int
 
-class UserResponse(BaseModel): #-----------------------------> Hides user info 
+class UserResponse(BaseModel):
     id: int
     name: str
     score : str 
 
-class PromptRequest(BaseModel):   #----------------------------> last a ai post user er ikhano use oitase
+class PromptRequest(BaseModel):   
     prompt : str
 
 
@@ -85,7 +85,7 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
 
 
 
-@app.post("/ask-ai") #--------------------------------------> Ai re jiganir jinish potro
+@app.post("/ask-ai") 
 def ask_ai(request : PromptRequest):
         chat_completion = client.chat.completions.create(
             messages=[
