@@ -1,55 +1,49 @@
 import os
-from groq import Groq
-from fastapi import FastAPI
-from pydantic import BaseModel
-from fastapi import FastAPI, HTTPException, Depends
-from sqlalchemy import create_engine, Column , Integer, String
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-
-from sentence_transformers import SentenceTransformer
+import math
 import numpy as np
+from dotenv import load_dotenv
 
-from langchain.tools import Tool
+from fastapi import FastAPI, Depends
+from pydantic import BaseModel
+
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.orm import declarative_base, sessionmaker, Session
+
+from groq import Groq
+from sentence_transformers import SentenceTransformer
+
+from langchain_core.tools import Tool
 from langchain.agents import initialize_agent, AgentType
 from langchain_groq import ChatGroq
 
-
-from dotenv import load_dotenv    
+# ------------------ ENV ------------------
 load_dotenv()
 
-
+# ------------------ FASTAPI ------------------
 app = FastAPI()
 
+# ------------------ GROQ CLIENT ------------------
 client = Groq(
     api_key=os.environ.get("GROQ_API_KEY"),
 )
 
-embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+# ------------------ EMBEDDINGS ------------------
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 documents = [
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
-    
     "SQLAlchemy is an ORM (Object Relational Mapper) that allows interaction with databases using Python code.",
-    
     "RAG stands for Retrieval Augmented Generation, a technique that improves AI responses by providing external context.",
-    
     "Large Language Models (LLMs) generate human-like text but may not always have updated or domain-specific knowledge.",
-    
     "Python is widely used for backend development, machine learning, and AI applications.",
-    
     "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
 doc_embeddings = embedding_model.encode(documents)
 
-
-
-
-
+# ------------------ SEARCH ------------------
 def search_docs(query):
     query_embedding = embedding_model.encode(query)
-
     similarities = []
 
     for i, doc_embedding in enumerate(doc_embeddings):
@@ -59,50 +53,36 @@ def search_docs(query):
         similarities.append((similarity, documents[i]))
 
     similarities.sort(reverse=True)
-
     return [doc for score, doc in similarities[:3]]
 
-
-
-
-def calculator_tool(query: str):  
+# ------------------ TOOLS ------------------
+def calculator_tool(query: str):
     try:
-        return str(eval(query))
+        return str(eval(query, {"__builtins__": None}, {"math": math}))
     except:
         return "Invalid math expression"
 
-def search_tool(query: str):  
+def search_tool(query: str):
     results = search_docs(query)
     return "\n".join(results)
 
-
-
-engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False}) 
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ------------------ DATABASE ------------------
+engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
 
-
-class UserDB(Base): 
+class UserDB(Base):
     __tablename__ = "users"
-    id=Column(Integer,primary_key=True,index=True)
+    id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     score = Column(Integer)
 
-class UserCreate(BaseModel): 
+class UserCreate(BaseModel):
     name: str
     score: int
 
-class UserResponse(BaseModel):
-    id: int
-    name: str
-    score : str 
-
-class PromptRequest(BaseModel):   
-    prompt : str
-
-
-    class Config:
-        from_attributes = True
+class PromptRequest(BaseModel):
+    prompt: str
 
 Base.metadata.create_all(bind=engine)
 
@@ -113,15 +93,14 @@ def get_db():
     finally:
         db.close()
 
-
+# ------------------ ROUTES ------------------
 @app.get("/")
 def root():
-    return {"message":"api is running"}
+    return {"message": "API is running 🚀"}
 
 @app.get("/users")
 def get_users(db: Session = Depends(get_db)):
     return db.query(UserDB).all()
-
 
 @app.get("/users/top")
 def filter_users(db: Session = Depends(get_db)):
@@ -131,41 +110,29 @@ def filter_users(db: Session = Depends(get_db)):
 @app.post("/users/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
     new_user = UserDB(name=user.name, score=user.score)
-
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-
     return {"message": "User added successfully", "user": new_user}
 
+# ------------------ BASIC AI ------------------
+@app.post("/ask-ai")
+def ask_ai(request: PromptRequest):
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": request.prompt}],
+        model="llama-3.3-70b-versatile",
+    )
+    return {
+        "response": chat_completion.choices[0].message.content
+    }
 
-
-
-@app.post("/ask-ai") 
-def ask_ai(request : PromptRequest):
-        chat_completion = client.chat.completions.create(
-            messages=[
-                {"role": "user", "content": request.prompt}
-            ],
-            model="llama-3.3-70b-versatile", 
-        )
-        return{
-            "response": chat_completion.choices[0].message.content
-        }
-
-
+# ------------------ RAG ------------------
 @app.post("/ask-doc")
 def ask_doc(request: PromptRequest):
-
-    # 1. Retrieve relevant documents
     relevant_docs = search_docs(request.prompt)
-
-    # 2. Combine context
     context = "\n".join(relevant_docs)
 
-    # 3. Create prompt
     final_prompt = f"""
-
 You are a helpful assistant.
 
 Answer ONLY using the context below.
@@ -178,11 +145,8 @@ Question:
 {request.prompt}
 """
 
-    # 4. Call LLM
     chat_completion = client.chat.completions.create(
-        messages=[
-            {"role": "user", "content": final_prompt}
-        ],
+        messages=[{"role": "user", "content": final_prompt}],
         model="llama-3.3-70b-versatile",
     )
 
@@ -191,13 +155,14 @@ Question:
         "context_used": relevant_docs
     }
 
-llm = ChatGroq(  
-    temperature=0, #-----------------------------------> Basically itay amrare koy j kototuk random akta ai hoite pare 
+# ------------------ AGENT ------------------
+llm = ChatGroq(
+    temperature=0,
     model_name="llama-3.3-70b-versatile",
-    groq_api_key=os.environ.get("GROQ_API_KEY")
+    groq_api_key=os.environ.get("GROQ_API_KEY"),
 )
 
-tools = [  
+tools = [
     Tool(
         name="Calculator",
         func=calculator_tool,
@@ -210,20 +175,16 @@ tools = [
     )
 ]
 
-agent = initialize_agent(  
-    tools,
-    llm,
+agent_executor = initialize_agent(
+    tools=tools,
+    llm=llm,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True
 )
 
-
-@app.post("/agent")  
+@app.post("/agent")
 def run_agent(request: PromptRequest):
-    response = agent.run(request.prompt)
+    response = agent_executor.invoke(request.prompt)
     return {
         "response": response
     }
-
-
-
