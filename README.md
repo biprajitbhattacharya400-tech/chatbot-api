@@ -1,8 +1,12 @@
-# 🚀 FastAPI + Groq LLM + Semantic RAG API Project
+# 🚀 FastAPI + Groq LLM + Semantic RAG + AI Agent
 
-A clean and scalable backend project built with **FastAPI**, **SQLAlchemy**, and **Groq LLM integration**.
+A production-style backend project built with **FastAPI**, integrating **Groq LLM**, **Semantic RAG (vector embeddings)**, and an **AI Agent using LangChain**.
 
-This API combines traditional backend development with modern AI capabilities, including a **Retrieval-Augmented Generation (RAG)** system powered by **vector embeddings** for semantic search.
+This system demonstrates how modern AI applications combine:
+- Backend APIs
+- Retrieval-Augmented Generation (RAG)
+- Vector search
+- Tool-using AI agents
 
 ---
 
@@ -10,12 +14,12 @@ This API combines traditional backend development with modern AI capabilities, i
 
 * 🧱 REST API using FastAPI  
 * 🗄️ SQLite database with SQLAlchemy  
-* 👤 User management (CRUD basics)  
-* 🤖 AI-powered endpoint using Groq (LLaMA 3.3 model)  
-* 🔐 Environment variable support for API keys  
+* 👤 User management system  
+* 🤖 LLM-powered endpoint (`/ask-ai`)  
 * 🔥 Semantic RAG system (`/ask-doc`)  
-* 🧠 Vector-based document retrieval using embeddings  
-* 📄 Context-aware AI responses  
+* 🧠 Vector-based document retrieval (embeddings)  
+* ⚡ AI Agent with tool usage (`/agent`)  
+* 🔧 Multi-tool system (Calculator + Document Search)  
 
 ---
 
@@ -28,6 +32,7 @@ This API combines traditional backend development with modern AI capabilities, i
 * Groq API (LLaMA 3.3 70B)  
 * Sentence-Transformers  
 * NumPy  
+* LangChain  
 * Python-dotenv  
 
 ---
@@ -36,9 +41,9 @@ This API combines traditional backend development with modern AI capabilities, i
 
 ```
 .
-├── main.py          # Main FastAPI application
-├── users.db         # SQLite database (auto-created)
-├── .env             # Environment variables (API key)
+├── main.py
+├── users.db
+├── .env
 ├── requirements.txt
 └── README.md
 ```
@@ -72,11 +77,19 @@ venv\Scripts\activate      # Windows
 pip install -r requirements.txt
 ```
 
+Or manually:
+
+```bash
+pip install fastapi uvicorn sqlalchemy pydantic python-dotenv groq
+pip install sentence-transformers torch numpy
+pip install langchain langchain-community langchain-core langchain-groq
+```
+
 ---
 
 ### 4️⃣ Set up environment variables
 
-Create a `.env` file:
+Create `.env` file:
 
 ```env
 GROQ_API_KEY=your_api_key_here
@@ -103,126 +116,135 @@ http://127.0.0.1:8000/docs
 ## 📡 API Endpoints
 
 ### 🏠 Root
-
 ```
 GET /
 ```
 
 ---
 
-### 👤 Get all users
-
+### 👤 User APIs
 ```
 GET /users
-```
-
----
-
-### 🏆 Get top users
-
-```
 GET /users/top
-```
-
----
-
-### ➕ Create user
-
-```
 POST /users/
 ```
 
 ---
 
-### 🤖 Ask AI (General LLM)
-
+### 🤖 Ask AI (LLM)
 ```
 POST /ask-ai
 ```
 
 ---
 
-### 🔥 Ask AI with Semantic RAG
-
+### 🔥 Ask AI with RAG
 ```
 POST /ask-doc
 ```
 
-**Request Body:**
+Uses semantic search to retrieve relevant documents before generating answers.
 
-```json
-{
-  "prompt": "Explain RAG"
-}
+---
+
+### ⚡ AI Agent (LangChain)
+```
+POST /agent
 ```
 
-**Response:**
+This endpoint uses an **AI Agent** that can:
+- Perform calculations
+- Search documents
+- Decide which tool to use automatically
 
-```json
-{
-  "answer": "...",
-  "context_used": ["..."]
-}
+---
+
+## 🧠 How It Works
+
+### 🔹 Basic LLM
+```
+User → LLM → Response
 ```
 
 ---
 
-## 🧠 How AI Integration Works
-
-### 🤖 Basic LLM (`/ask-ai`)
-
-1. User sends prompt  
-2. Sent directly to LLM  
-3. Response returned  
-
----
-
-### 🔥 Semantic RAG System (`/ask-doc`)
-
-1. Documents are converted into **vector embeddings**  
-2. User query is also converted into an embedding  
-3. Cosine similarity is used to find the most relevant documents  
-4. Top documents are passed as **context** to the LLM  
-5. LLM generates answer based on that context  
-
----
-
-## 🧠 Example Flow
-
+### 🔹 Semantic RAG
 ```
-User Query → Convert to Vector → Compare with Doc Vectors → Retrieve Top Docs → LLM → Answer
+User → Convert to Embedding → Compare with Documents → Retrieve → LLM → Answer
 ```
 
 ---
 
-## 🆚 Keyword Search vs Semantic Search
-
-| Approach          | Limitation          | Improvement |
-|-------------------|---------------------|-------------|
-| Keyword Matching  | Needs exact words   |     ❌      |
-| Vector Embeddings | Understands meaning |     ✅      |
-
-Example:
+### 🔹 AI Agent (LangChain)
 
 ```
-"Explain RAG" ≈ "What is Retrieval Augmented Generation"
+User Query
+   ↓
+Agent (LLM)
+   ↓
+Decides:
+   → Calculator Tool
+   → Document Search Tool
+   ↓
+Executes tool
+   ↓
+Returns final answer
 ```
+
+---
+
+## 🔧 Tools Used by Agent
+
+### 🧮 Calculator Tool
+Handles mathematical queries using Python evaluation.
+
+### 📄 Document Search Tool
+Uses embedding-based similarity search for retrieving relevant context.
+
+---
+
+## 🧠 Example Queries
+
+### Calculator:
+```
+What is 25 * 4?
+```
+
+### RAG:
+```
+What is RAG?
+```
+
+### Agent:
+```
+Explain RAG
+What is 10 + 15?
+```
+
+---
+
+## 🆚 Keyword vs Semantic Search
+
+| Approach            | Limitation          | Improvement |
+|---------------------|---------------------|-------------|
+| Keyword Matching    | Needs exact words   |     ❌      |
+| Embeddings          | Understands meaning |     ✅      |
 
 ---
 
 ## ⚠️ Common Issues
 
 * ❌ Missing API key → check `.env`  
-* ❌ Model download delay → first run takes time  
-* ❌ Missing dependencies → install `sentence-transformers`, `torch`, `numpy`  
+* ❌ First run slow → model download  
+* ❌ Import errors → install all dependencies  
 
 ---
 
 ## 💡 Future Improvements
 
-* ⚡ Vector database (FAISS / Pinecone)  
-* 📂 Upload custom documents (PDF, TXT)  
-* 💬 Chat memory (multi-turn RAG)  
+* 🔥 Vector database (FAISS / Pinecone)  
+* 📂 Upload documents (PDF, TXT)  
+* 💬 Chat memory (multi-turn agents)  
 * ⚡ Streaming responses  
 * 🌐 Frontend integration  
 
@@ -230,19 +252,19 @@ Example:
 
 ## 🙌 Acknowledgements
 
-Built as a learning + practical project to understand:
+Built to explore:
 
-* Backend API design  
-* Database integration  
+* Backend API development  
 * LLM integration  
+* Semantic search  
 * Retrieval-Augmented Generation (RAG)  
-* Semantic search using embeddings  
+* AI Agents (LangChain)  
 
 ---
 
 ## 📜 License
 
-This project is open-source and free to use.
+Open-source and free to use.
 
 ---
 

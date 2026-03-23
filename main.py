@@ -10,6 +10,10 @@ from sqlalchemy.orm import sessionmaker, Session
 from sentence_transformers import SentenceTransformer
 import numpy as np
 
+from langchain.tools import Tool
+from langchain.agents import initialize_agent, AgentType
+from langchain_groq import ChatGroq
+
 
 from dotenv import load_dotenv    
 load_dotenv()
@@ -59,6 +63,17 @@ def search_docs(query):
     return [doc for score, doc in similarities[:3]]
 
 
+
+
+def calculator_tool(query: str):  
+    try:
+        return str(eval(query))
+    except:
+        return "Invalid math expression"
+
+def search_tool(query: str):  
+    results = search_docs(query)
+    return "\n".join(results)
 
 
 
@@ -176,7 +191,39 @@ Question:
         "context_used": relevant_docs
     }
 
+llm = ChatGroq(  
+    temperature=0, #-----------------------------------> Basically itay amrare koy j kototuk random akta ai hoite pare 
+    model_name="llama-3.3-70b-versatile",
+    groq_api_key=os.environ.get("GROQ_API_KEY")
+)
 
+tools = [  
+    Tool(
+        name="Calculator",
+        func=calculator_tool,
+        description="Use this for math calculations like 25 * 4"
+    ),
+    Tool(
+        name="Document Search",
+        func=search_tool,
+        description="Use this to answer questions from documents"
+    )
+]
+
+agent = initialize_agent(  
+    tools,
+    llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
+)
+
+
+@app.post("/agent")  
+def run_agent(request: PromptRequest):
+    response = agent.run(request.prompt)
+    return {
+        "response": response
+    }
 
 
 
