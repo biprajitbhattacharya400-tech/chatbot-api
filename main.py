@@ -10,7 +10,8 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from groq import Groq
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from langchain_core.tools import Tool
 from langchain.agents import initialize_agent, AgentType
@@ -28,7 +29,7 @@ client = Groq(
 )
 
 # ------------------ EMBEDDINGS ------------------
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+vectorizer = TfidfVectorizer()
 
 documents = [
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
@@ -39,21 +40,15 @@ documents = [
     "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
-doc_embeddings = embedding_model.encode(documents)
+doc_vectors = vectorizer.fit_transform(documents)
 
 # ------------------ SEARCH ------------------
 def search_docs(query):
-    query_embedding = embedding_model.encode(query)
-    similarities = []
+    query_vec = vectorizer.transform([query])
+    similarities = cosine_similarity(query_vec, doc_vectors).flatten()
 
-    for i, doc_embedding in enumerate(doc_embeddings):
-        similarity = np.dot(query_embedding, doc_embedding) / (
-            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
-        )
-        similarities.append((similarity, documents[i]))
-
-    similarities.sort(reverse=True)
-    return [doc for score, doc in similarities[:3]]
+    top_indices = similarities.argsort()[-3:][::-1]
+    return [documents[i] for i in top_indices]
 
 # ------------------ TOOLS ------------------
 def calculator_tool(query: str):
