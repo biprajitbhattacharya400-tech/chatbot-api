@@ -179,7 +179,7 @@ agent_executor = initialize_agent(
 
 @app.post("/agent")
 def run_agent(request: PromptRequest):
-    response = agent_executor.invoke(request.prompt)
+    response = agent_executor.run(request.prompt)
     return {
         "response": response
     }
