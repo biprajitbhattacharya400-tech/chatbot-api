@@ -25,7 +25,7 @@ app = FastAPI()
 
 # ------------------ GROQ CLIENT ------------------
 client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
+    api_key=os.environ["GROQ_API_KEY"],
 )
 
 # ------------------ EMBEDDINGS ------------------
@@ -154,7 +154,7 @@ Question:
 llm = ChatGroq(
     temperature=0,
     model_name="llama-3.3-70b-versatile",
-    groq_api_key=os.environ.get("GROQ_API_KEY"),
+    groq_api_key=os.environ["GROQ_API_KEY"],
 )
 
 tools = [
