@@ -1,6 +1,7 @@
 import os
 import math
 import numpy as np
+import traceback
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Depends
@@ -179,7 +180,12 @@ agent_executor = initialize_agent(
 
 @app.post("/agent")
 def run_agent(request: PromptRequest):
-    response = agent_executor.run(request.prompt)
-    return {
-        "response": response
-    }
+    try:
+        response = agent_executor.run(request.prompt)
+        return {
+            "response": response
+        }
+    except Exception as e:
+        return {
+            "error": str(e)
+        }
