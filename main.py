@@ -15,8 +15,12 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 from langchain_core.tools import Tool
-from langchain.agents import initialize_agent, AgentType
+# FIX 2: Use create_react_agent instead of deprecated initialize_agent
+from langchain.agents import create_react_agent, AgentExecutor
+from langchain import hub
 from langchain_groq import ChatGroq
+
+import uvicorn  # FIX 1: needed for dynamic port binding
 
 # ------------------ ENV ------------------
 load_dotenv()
@@ -47,15 +51,45 @@ doc_vectors = vectorizer.fit_transform(documents)
 def search_docs(query):
     query_vec = vectorizer.transform([query])
     similarities = cosine_similarity(query_vec, doc_vectors).flatten()
-
     top_indices = similarities.argsort()[-3:][::-1]
     return [documents[i] for i in top_indices]
 
 # ------------------ TOOLS ------------------
+# FIX 3: Replaced unsafe eval() with simpler expression parser using ast
+import ast
+import operator
+
+SAFE_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+    ast.USub: operator.neg,
+}
+
+def safe_eval(node):
+    if isinstance(node, ast.Constant):
+        return node.n
+    elif isinstance(node, ast.BinOp):
+        op = SAFE_OPERATORS.get(type(node.op))
+        if op is None:
+            raise ValueError("Unsupported operator")
+        return op(safe_eval(node.left), safe_eval(node.right))
+    elif isinstance(node, ast.UnaryOp):
+        op = SAFE_OPERATORS.get(type(node.op))
+        if op is None:
+            raise ValueError("Unsupported operator")
+        return op(safe_eval(node.operand))
+    else:
+        raise ValueError("Unsupported expression")
+
 def calculator_tool(query: str):
     try:
-        return str(eval(query, {"__builtins__": None}, {"math": math}))
-    except:
+        tree = ast.parse(query, mode="eval")
+        result = safe_eval(tree.body)
+        return str(result)
+    except Exception:
         return "Invalid math expression"
 
 def search_tool(query: str):
@@ -118,9 +152,7 @@ def ask_ai(request: PromptRequest):
         messages=[{"role": "user", "content": request.prompt}],
         model="llama-3.3-70b-versatile",
     )
-    return {
-        "response": chat_completion.choices[0].message.content
-    }
+    return {"response": chat_completion.choices[0].message.content}
 
 # ------------------ RAG ------------------
 @app.post("/ask-doc")
@@ -171,21 +203,21 @@ tools = [
     )
 ]
 
-agent_executor = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)
+# FIX 2: Updated to use non-deprecated create_react_agent
+prompt = hub.pull("hwchase17/react")
+agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
+agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
 
 @app.post("/agent")
 def run_agent(request: PromptRequest):
     try:
-        response = agent_executor.run(request.prompt)
-        return {
-            "response": response
-        }
+        response = agent_executor.invoke({"input": request.prompt})
+        return {"response": response["output"]}
     except Exception as e:
-        return {
-            "error": str(e)
-        }
+        return {"error": str(e)}
+
+
+# FIX 1: Bind to Railway's dynamic PORT env variable
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
