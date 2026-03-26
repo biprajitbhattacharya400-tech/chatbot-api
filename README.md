@@ -229,7 +229,7 @@ MIT License
 
 ## 💬 Author
 
-Built with ❤️ by Biprojit
+Built with ❤️ by Biprajit
 
 ---
 
