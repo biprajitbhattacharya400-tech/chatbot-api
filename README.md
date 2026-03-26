@@ -1,14 +1,6 @@
 # 🚀 FastAPI + Groq LLM + Semantic RAG + AI Agent
 
-A **production-style AI backend** built with **FastAPI**, integrating **Groq LLM**, **Semantic RAG (Retrieval-Augmented Generation)**, and an intelligent **tool-using AI Agent (LangChain)**.
-
-This project demonstrates how modern AI systems combine:
-
-* ⚡ High-performance backend APIs
-* 🧠 Large Language Models (LLMs)
-* 🔍 Semantic search with embeddings
-* 🔗 Retrieval-Augmented Generation (RAG)
-* 🤖 Autonomous agents with tool usage
+> ⚡ Production-style AI backend using FastAPI, LangChain, Groq LLM, and Semantic RAG
 
 ---
 
@@ -47,7 +39,8 @@ This project demonstrates how modern AI systems combine:
 ├── users.db
 ├── requirements.txt
 ├── .env              # (not committed)
-└── README.md
+├── README.md
+└── screenshot.png    # API preview (optional)
 ```
 
 ---
@@ -87,6 +80,7 @@ Create a `.env` file:
 
 ```env
 GROQ_API_KEY=your_api_key_here
+HF_TOKEN=optional_huggingface_token
 ```
 
 ---
@@ -94,7 +88,7 @@ GROQ_API_KEY=your_api_key_here
 ### 5️⃣ Run the Server
 
 ```bash
-python -m uvicorn main:app --reload
+uvicorn main:app --reload
 ```
 
 ---
@@ -235,7 +229,7 @@ What is Retrieval-Augmented Generation?
 ### ➤ Agent
 
 ```
-Explain FastAPI
+Explain FastAPI  
 What is 15 + 27?
 ```
 
@@ -250,12 +244,18 @@ What is 15 + 27?
 
 ---
 
-## ⚠️ Common Issues
+## 📸 API Preview
 
-* ❌ Missing API key → Check `.env`
-* ❌ First run slow → Model download
-* ❌ Import errors → Reinstall dependencies
-* ❌ Env mismatch → Activate `.venv`
+![API Docs](./screenshot.png)
+
+---
+
+## 🔐 Environment Variables
+
+| Variable     | Description                  |
+| ------------ | ---------------------------- |
+| GROQ_API_KEY | Groq API key                 |
+| HF_TOKEN     | (Optional) HuggingFace token |
 
 ---
 
@@ -266,7 +266,6 @@ What is 15 + 27?
 * 💬 Chat memory (multi-turn)
 * ⚡ Streaming responses
 * 🌐 Frontend (React / Next.js)
-* ☁️ Deployment (Render / Railway)
 
 ---
 
