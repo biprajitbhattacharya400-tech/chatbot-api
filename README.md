@@ -29,6 +29,7 @@ This repo is configured for a Render web service.
 
 - Build command: `pip install --no-cache-dir -r requirements.txt`
 - Start command: `python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}`
+- Python version: `3.11.9` via `.python-version`
 - Required env var: `GROQ_API_KEY`
 - Optional env vars: `GROQ_MODEL`, `DATABASE_URL`
 
