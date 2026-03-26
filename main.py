@@ -1,36 +1,32 @@
-import os
 import math
+import os
+from functools import lru_cache
+from pathlib import Path
+
 import numpy as np
 from dotenv import load_dotenv
-
-from fastapi import FastAPI, Depends
+from fastapi import Depends, FastAPI, HTTPException
 from pydantic import BaseModel
-
-from sqlalchemy import create_engine, Column, Integer, String
-from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from sqlalchemy import Column, Integer, String, create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from groq import Groq
+from langchain.agents import AgentType, initialize_agent
+from langchain_core.tools import Tool
+from langchain_groq import ChatGroq
 from sentence_transformers import SentenceTransformer
 
-from langchain_core.tools import Tool
-from langchain.agents import initialize_agent, AgentType
-from langchain_groq import ChatGroq
 
-# ------------------ ENV ------------------
 load_dotenv()
 
-# ------------------ FASTAPI ------------------
-app = FastAPI()
+app = FastAPI(title="Chatbot API", version="1.0.0")
 
-# ------------------ GROQ CLIENT ------------------
-client = Groq(
-    api_key=os.environ.get("GROQ_API_KEY"),
-)
+BASE_DIR = Path(__file__).resolve().parent
+DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'users.db'}")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-# ------------------ EMBEDDINGS ------------------
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-documents = [
+DOCUMENTS = [
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
     "SQLAlchemy is an ORM (Object Relational Mapper) that allows interaction with databases using Python code.",
     "RAG stands for Retrieval Augmented Generation, a technique that improves AI responses by providing external context.",
@@ -39,52 +35,34 @@ documents = [
     "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
-doc_embeddings = embedding_model.encode(documents)
 
-# ------------------ SEARCH ------------------
-def search_docs(query):
-    query_embedding = embedding_model.encode(query)
-    similarities = []
-
-    for i, doc_embedding in enumerate(doc_embeddings):
-        similarity = np.dot(query_embedding, doc_embedding) / (
-            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
-        )
-        similarities.append((similarity, documents[i]))
-
-    similarities.sort(reverse=True)
-    return [doc for score, doc in similarities[:3]]
-
-# ------------------ TOOLS ------------------
-def calculator_tool(query: str):
-    try:
-        return str(eval(query, {"__builtins__": None}, {"math": math}))
-    except:
-        return "Invalid math expression"
-
-def search_tool(query: str):
-    results = search_docs(query)
-    return "\n".join(results)
-
-# ------------------ DATABASE ------------------
-engine = create_engine("sqlite:///users.db", connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(bind=engine)
+engine = create_engine(
+    DATABASE_URL,
+    connect_args={"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {},
+)
+SessionLocal = sessionmaker(bind=engine, autocommit=False, autoflush=False)
 Base = declarative_base()
+
 
 class UserDB(Base):
     __tablename__ = "users"
+
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
     score = Column(Integer)
+
 
 class UserCreate(BaseModel):
     name: str
     score: int
 
+
 class PromptRequest(BaseModel):
     prompt: str
 
+
 Base.metadata.create_all(bind=engine)
+
 
 def get_db():
     db = SessionLocal()
@@ -93,19 +71,110 @@ def get_db():
     finally:
         db.close()
 
-# ------------------ ROUTES ------------------
+
+def require_groq_api_key() -> str:
+    if not GROQ_API_KEY:
+        raise HTTPException(
+            status_code=500,
+            detail="GROQ_API_KEY is not configured. Set it in the deployment environment.",
+        )
+    return GROQ_API_KEY
+
+
+@lru_cache(maxsize=1)
+def get_groq_client() -> Groq:
+    return Groq(api_key=require_groq_api_key())
+
+
+@lru_cache(maxsize=1)
+def get_embedding_model() -> SentenceTransformer:
+    return SentenceTransformer("all-MiniLM-L6-v2")
+
+
+@lru_cache(maxsize=1)
+def get_doc_embeddings():
+    return get_embedding_model().encode(DOCUMENTS)
+
+
+def search_docs(query: str):
+    query_embedding = get_embedding_model().encode(query)
+    doc_embeddings = get_doc_embeddings()
+    similarities = []
+
+    for i, doc_embedding in enumerate(doc_embeddings):
+        similarity = np.dot(query_embedding, doc_embedding) / (
+            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
+        )
+        similarities.append((similarity, DOCUMENTS[i]))
+
+    similarities.sort(reverse=True)
+    return [doc for score, doc in similarities[:3]]
+
+
+def calculator_tool(query: str):
+    try:
+        return str(eval(query, {"__builtins__": None}, {"math": math}))
+    except Exception:
+        return "Invalid math expression"
+
+
+def search_tool(query: str):
+    return "\n".join(search_docs(query))
+
+
+@lru_cache(maxsize=1)
+def get_agent_executor():
+    llm = ChatGroq(
+        temperature=0,
+        model_name=GROQ_MODEL,
+        groq_api_key=require_groq_api_key(),
+    )
+
+    tools = [
+        Tool(
+            name="Calculator",
+            func=calculator_tool,
+            description="Use this for math calculations like 25 * 4",
+        ),
+        Tool(
+            name="Document Search",
+            func=search_tool,
+            description="Use this to answer questions from documents",
+        ),
+    ]
+
+    return initialize_agent(
+        tools=tools,
+        llm=llm,
+        agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+        verbose=False,
+    )
+
+
 @app.get("/")
 def root():
-    return {"message": "API is running 🚀"}
+    return {"message": "API is running"}
+
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok",
+        "database": "configured",
+        "groq_api_key_configured": bool(GROQ_API_KEY),
+    }
+
 
 @app.get("/users")
 def get_users(db: Session = Depends(get_db)):
     return db.query(UserDB).all()
 
+
 @app.get("/users/top")
 def filter_users(db: Session = Depends(get_db)):
     users = db.query(UserDB).filter(UserDB.score > 80).order_by(UserDB.score.desc()).all()
     return [user.name for user in users]
+
 
 @app.post("/users/")
 def create_user(user: UserCreate, db: Session = Depends(get_db)):
@@ -115,18 +184,16 @@ def create_user(user: UserCreate, db: Session = Depends(get_db)):
     db.refresh(new_user)
     return {"message": "User added successfully", "user": new_user}
 
-# ------------------ BASIC AI ------------------
+
 @app.post("/ask-ai")
 def ask_ai(request: PromptRequest):
-    chat_completion = client.chat.completions.create(
+    chat_completion = get_groq_client().chat.completions.create(
         messages=[{"role": "user", "content": request.prompt}],
-        model="llama-3.3-70b-versatile",
+        model=GROQ_MODEL,
     )
-    return {
-        "response": chat_completion.choices[0].message.content
-    }
+    return {"response": chat_completion.choices[0].message.content}
 
-# ------------------ RAG ------------------
+
 @app.post("/ask-doc")
 def ask_doc(request: PromptRequest):
     relevant_docs = search_docs(request.prompt)
@@ -145,46 +212,25 @@ Question:
 {request.prompt}
 """
 
-    chat_completion = client.chat.completions.create(
+    chat_completion = get_groq_client().chat.completions.create(
         messages=[{"role": "user", "content": final_prompt}],
-        model="llama-3.3-70b-versatile",
+        model=GROQ_MODEL,
     )
 
     return {
         "answer": chat_completion.choices[0].message.content,
-        "context_used": relevant_docs
+        "context_used": relevant_docs,
     }
 
-# ------------------ AGENT ------------------
-llm = ChatGroq(
-    temperature=0,
-    model_name="llama-3.3-70b-versatile",
-    groq_api_key=os.environ.get("GROQ_API_KEY"),
-)
-
-tools = [
-    Tool(
-        name="Calculator",
-        func=calculator_tool,
-        description="Use this for math calculations like 25 * 4"
-    ),
-    Tool(
-        name="Document Search",
-        func=search_tool,
-        description="Use this to answer questions from documents"
-    )
-]
-
-agent_executor = initialize_agent(
-    tools=tools,
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)
 
 @app.post("/agent")
 def run_agent(request: PromptRequest):
-    response = agent_executor.invoke(request.prompt)
-    return {
-        "response": response
-    }
+    response = get_agent_executor().invoke({"input": request.prompt})
+    return {"response": response}
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    port = int(os.getenv("PORT", "8000"))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
