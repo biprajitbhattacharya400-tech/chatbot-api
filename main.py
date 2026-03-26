@@ -1,7 +1,6 @@
 import os
 import math
 import numpy as np
-import traceback
 from dotenv import load_dotenv
 
 from fastapi import FastAPI, Depends
@@ -11,16 +10,11 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
 
 from groq import Groq
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.metrics.pairwise import cosine_similarity
+from sentence_transformers import SentenceTransformer
 
 from langchain_core.tools import Tool
-# FIX 2: Use create_react_agent instead of deprecated initialize_agent
-from langchain.agents import create_react_agent, AgentExecutor
-from langchain import hub
+from langchain.agents import initialize_agent, AgentType
 from langchain_groq import ChatGroq
-
-import uvicorn  # FIX 1: needed for dynamic port binding
 
 # ------------------ ENV ------------------
 load_dotenv()
@@ -30,11 +24,11 @@ app = FastAPI()
 
 # ------------------ GROQ CLIENT ------------------
 client = Groq(
-    api_key=os.environ["GROQ_API_KEY"],
+    api_key=os.environ.get("GROQ_API_KEY"),
 )
 
 # ------------------ EMBEDDINGS ------------------
-vectorizer = TfidfVectorizer()
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 
 documents = [
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
@@ -45,51 +39,27 @@ documents = [
     "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
-doc_vectors = vectorizer.fit_transform(documents)
+doc_embeddings = embedding_model.encode(documents)
 
 # ------------------ SEARCH ------------------
 def search_docs(query):
-    query_vec = vectorizer.transform([query])
-    similarities = cosine_similarity(query_vec, doc_vectors).flatten()
-    top_indices = similarities.argsort()[-3:][::-1]
-    return [documents[i] for i in top_indices]
+    query_embedding = embedding_model.encode(query)
+    similarities = []
+
+    for i, doc_embedding in enumerate(doc_embeddings):
+        similarity = np.dot(query_embedding, doc_embedding) / (
+            np.linalg.norm(query_embedding) * np.linalg.norm(doc_embedding)
+        )
+        similarities.append((similarity, documents[i]))
+
+    similarities.sort(reverse=True)
+    return [doc for score, doc in similarities[:3]]
 
 # ------------------ TOOLS ------------------
-# FIX 3: Replaced unsafe eval() with simpler expression parser using ast
-import ast
-import operator
-
-SAFE_OPERATORS = {
-    ast.Add: operator.add,
-    ast.Sub: operator.sub,
-    ast.Mult: operator.mul,
-    ast.Div: operator.truediv,
-    ast.Pow: operator.pow,
-    ast.USub: operator.neg,
-}
-
-def safe_eval(node):
-    if isinstance(node, ast.Constant):
-        return node.n
-    elif isinstance(node, ast.BinOp):
-        op = SAFE_OPERATORS.get(type(node.op))
-        if op is None:
-            raise ValueError("Unsupported operator")
-        return op(safe_eval(node.left), safe_eval(node.right))
-    elif isinstance(node, ast.UnaryOp):
-        op = SAFE_OPERATORS.get(type(node.op))
-        if op is None:
-            raise ValueError("Unsupported operator")
-        return op(safe_eval(node.operand))
-    else:
-        raise ValueError("Unsupported expression")
-
 def calculator_tool(query: str):
     try:
-        tree = ast.parse(query, mode="eval")
-        result = safe_eval(tree.body)
-        return str(result)
-    except Exception:
+        return str(eval(query, {"__builtins__": None}, {"math": math}))
+    except:
         return "Invalid math expression"
 
 def search_tool(query: str):
@@ -152,7 +122,9 @@ def ask_ai(request: PromptRequest):
         messages=[{"role": "user", "content": request.prompt}],
         model="llama-3.3-70b-versatile",
     )
-    return {"response": chat_completion.choices[0].message.content}
+    return {
+        "response": chat_completion.choices[0].message.content
+    }
 
 # ------------------ RAG ------------------
 @app.post("/ask-doc")
@@ -187,7 +159,7 @@ Question:
 llm = ChatGroq(
     temperature=0,
     model_name="llama-3.3-70b-versatile",
-    groq_api_key=os.environ["GROQ_API_KEY"],
+    groq_api_key=os.environ.get("GROQ_API_KEY"),
 )
 
 tools = [
@@ -203,21 +175,16 @@ tools = [
     )
 ]
 
-# FIX 2: Updated to use non-deprecated create_react_agent
-prompt = hub.pull("hwchase17/react")
-agent = create_react_agent(llm=llm, tools=tools, prompt=prompt)
-agent_executor = AgentExecutor(agent=agent, tools=tools, verbose=True, handle_parsing_errors=True)
+agent_executor = initialize_agent(
+    tools=tools,
+    llm=llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
+)
 
 @app.post("/agent")
 def run_agent(request: PromptRequest):
-    try:
-        response = agent_executor.invoke({"input": request.prompt})
-        return {"response": response["output"]}
-    except Exception as e:
-        return {"error": str(e)}
-
-
-# FIX 1: Bind to Railway's dynamic PORT env variable
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    response = agent_executor.invoke(request.prompt)
+    return {
+        "response": response
+    }

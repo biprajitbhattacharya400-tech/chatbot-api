@@ -1,7 +1,5 @@
-.env
+venv/
 __pycache__/
-*.db
-tempCodeRunnerFile.py
-test_groq.py
-.venv/
-user.db
+*.pyc
+.env
+users.db
