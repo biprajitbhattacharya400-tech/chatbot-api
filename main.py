@@ -10,13 +10,6 @@ from pydantic import BaseModel
 from sqlalchemy import Column, Integer, String, create_engine
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
-from groq import Groq
-from langchain.agents import AgentType, initialize_agent
-from langchain_core.tools import Tool
-from langchain_groq import ChatGroq
-from sentence_transformers import SentenceTransformer
-
-
 load_dotenv()
 
 app = FastAPI(title="Chatbot API", version="1.0.0")
@@ -82,12 +75,16 @@ def require_groq_api_key() -> str:
 
 
 @lru_cache(maxsize=1)
-def get_groq_client() -> Groq:
+def get_groq_client():
+    from groq import Groq
+
     return Groq(api_key=require_groq_api_key())
 
 
 @lru_cache(maxsize=1)
-def get_embedding_model() -> SentenceTransformer:
+def get_embedding_model():
+    from sentence_transformers import SentenceTransformer
+
     return SentenceTransformer("all-MiniLM-L6-v2")
 
 
@@ -124,6 +121,10 @@ def search_tool(query: str):
 
 @lru_cache(maxsize=1)
 def get_agent_executor():
+    from langchain.agents import AgentType, initialize_agent
+    from langchain_core.tools import Tool
+    from langchain_groq import ChatGroq
+
     llm = ChatGroq(
         temperature=0,
         model_name=GROQ_MODEL,
