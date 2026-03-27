@@ -26,7 +26,7 @@ DOCUMENTS = [
     "RAG stands for Retrieval Augmented Generation, a technique that improves AI responses by providing external context.",
     "Large Language Models (LLMs) generate human-like text but may not always have updated or domain-specific knowledge.",
     "Python is widely used for backend development, machine learning, and AI applications.",
-    "In RAG systems, documents are searched first and then passed to the LLM to generate accurate answers.",
+    "In RAG (Retrieval Augmented Generation) systems, documents are searched first and then passed to the LLM to generate accurate answers.",
 ]
 
 
