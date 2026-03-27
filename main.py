@@ -20,7 +20,7 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
 DOCUMENTS = [
-    "Biprajit is a passionate and curious individual with a strong interest in technology and innovation. He enjoys building projects, exploring AI, and constantly upgrading his skills. With determination and creativity, he strives to turn ideas into impactful solutions."
+    "Biprajit is a passionate and curious individual with a strong interest in technology and innovation. He enjoys building projects, exploring AI, and constantly upgrading his skills. With determination and creativity, he strives to turn ideas into impactful solutions.",
     "FastAPI is a modern Python web framework used for building APIs quickly and efficiently.",
     "SQLAlchemy is an ORM (Object Relational Mapper) that allows interaction with databases using Python code.",
     "RAG stands for Retrieval Augmented Generation, a technique that improves AI responses by providing external context.",
